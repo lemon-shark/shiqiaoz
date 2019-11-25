@@ -1,30 +1,29 @@
-#!/usr/bin/env
+#!/bin/bash
 
-# An hook script to make use of push options.
-# The script rejects ask the contributors to redo their commit
-# messages if it not ends with format e.g. Fixes#585
+zero_commit='0000000000000000000000000000000000000000'
+msg_regex='[[A-Za-z]{5}\#[0-9]{3}\]'
 
-import sys
-import subprocess
-import re
-ref = sys.argv[1]
-old_rev = sys.argv[2]
-new_rev = sys.argv[3]
-cp = subprocess.run(
-        ['git','rev-list',old_rev+".."+new_rev],
-        check=True,
-        stdout=subprocess.PIPE,
-        universal_newlines=True
-    )
-commits = cp.stdout.strip().splitlines()
-for commit in commits:
-    cp = subprocess.run(
-        ['git','cat-file','commit',commit],
-        check=True,
-        stdout=subprocess.PIPE,
-        universal_newlines=True
-    )
-    commit_msg = cp.stdout.strip().splitlines()[5]
-    if not re.match(".*\[[a-zA-Z]{5}#\d{3}\]", commit_msg):
-         print("Issue identifier missing at the end of commit_msg. Please add an issue identifier, eg. [Fixes#123]")
-         sys.exit(1)
+while read -r oldrev newrev refname; do
+
+	# Branch or tag got deleted, ignore the push
+    [ "$newrev" = "$zero_commit" ] && continue
+
+    # Calculate range for new branch/updated branch
+    [ "$oldrev" = "$zero_commit" ] && range="$newrev" || range="$oldrev..$newrev"
+
+	for commit in $(git rev-list "$range" --not --all); do
+		if ! git log --max-count=1 --format=%B $commit | grep -iqE "$msg_regex"; then
+			echo "ERROR:"
+			echo "ERROR: Your push was rejected because the commit"
+			echo "ERROR: $commit in ${refname#refs/heads/}"
+			echo "ERROR: is missing the Issue number 'Fixes#123'."
+			echo "ERROR:"
+			echo "ERROR: Please fix the commit message and push again."
+			echo "ERROR: https://help.github.com/en/articles/changing-a-commit-message"
+			echo "ERROR"
+			exit 1
+		fi
+	done
+
+done
+
