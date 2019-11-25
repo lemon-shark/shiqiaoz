@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/env
 
 # An hook script to make use of push options.
 # The script rejects ask the contributors to redo their commit
